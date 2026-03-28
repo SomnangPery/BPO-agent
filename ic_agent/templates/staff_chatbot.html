@@ -9,38 +9,40 @@
         @import url('https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@400;500;600;700;800&display=swap');
 
         :root {
-            --ic-red-900: #7f1111;
-            --ic-red-700: #b91c1c;
-            --ic-red-600: #dc2626;
-            --ic-red-500: #ef4444;
-            --ic-red-100: #fee2e2;
-            --ic-red-50: #fef2f2;
+            --ic-green-900: #0b3b2e;
+            --ic-green-800: #115940;
+            --ic-green-700: #1f7a55;
+            --ic-green-600: #2f9a69;
+            --ic-gold-600: #d9a108;
+            --ic-gold-500: #f2c94c;
+            --ic-gold-100: #fff3cd;
+            --ic-green-50: #eef9f3;
             --ic-white: #ffffff;
             --ic-ink: #1f2023;
             --ic-muted: #6a6b70;
-            --ic-line: #f2b4b4;
+            --ic-line: #cde8d9;
         }
 
         body {
             font-family: 'Red Hat Display', sans-serif;
             background:
-                radial-gradient(circle at 10% -20%, rgba(239, 68, 68, 0.28), rgba(239, 68, 68, 0) 35%),
-                radial-gradient(circle at 95% 10%, rgba(220, 38, 38, 0.2), rgba(220, 38, 38, 0) 42%),
-                linear-gradient(155deg, #fffdfd 0%, #fff2f2 48%, #fff8f8 100%);
+                radial-gradient(circle at 10% -20%, rgba(31, 122, 85, 0.22), rgba(31, 122, 85, 0) 35%),
+                radial-gradient(circle at 95% 10%, rgba(242, 201, 76, 0.18), rgba(242, 201, 76, 0) 42%),
+                linear-gradient(155deg, #fcfffd 0%, #f4fbf7 48%, #fffef8 100%);
             min-height: 100vh;
             padding: 12px;
         }
 
         .container {
-            border: 1px solid rgba(185, 28, 28, 0.2);
-            box-shadow: 0 24px 58px rgba(127, 17, 17, 0.16);
+            border: 1px solid rgba(17, 89, 64, 0.22);
+            box-shadow: 0 24px 58px rgba(11, 59, 46, 0.14);
             display: flex;
             flex-direction: column;
             min-height: calc(100dvh - 24px);
         }
 
         .navbar {
-            background: linear-gradient(110deg, var(--ic-red-900) 0%, var(--ic-red-700) 58%, var(--ic-red-600) 100%);
+            background: linear-gradient(110deg, var(--ic-green-900) 0%, var(--ic-green-800) 58%, var(--ic-green-700) 100%);
             padding: 16px 28px;
             position: relative;
             overflow: hidden;
@@ -54,8 +56,8 @@
                 -45deg,
                 rgba(255, 255, 255, 0.05),
                 rgba(255, 255, 255, 0.05) 12px,
-                rgba(255, 255, 255, 0.02) 12px,
-                rgba(255, 255, 255, 0.02) 24px
+                rgba(242, 201, 76, 0.12) 12px,
+                rgba(242, 201, 76, 0.12) 24px
             );
             pointer-events: none;
         }
@@ -87,8 +89,8 @@
             flex: 1;
             min-height: 0;
             background:
-                radial-gradient(circle at 90% 0%, rgba(254, 226, 226, 0.8) 0%, rgba(254, 226, 226, 0) 35%),
-                linear-gradient(180deg, #fffdfd 0%, #fff8f8 100%);
+                radial-gradient(circle at 90% 0%, rgba(255, 243, 205, 0.65) 0%, rgba(255, 243, 205, 0) 35%),
+                linear-gradient(180deg, #fcfffd 0%, #f7fcf9 100%);
         }
 
         .chat-messages {
@@ -136,7 +138,7 @@
         }
 
         .user .message-content {
-            background: linear-gradient(140deg, var(--ic-red-700) 0%, var(--ic-red-500) 100%);
+            background: linear-gradient(140deg, var(--ic-green-800) 0%, var(--ic-green-600) 100%);
             color: var(--ic-white);
             border-bottom-right-radius: 6px;
         }
@@ -144,14 +146,14 @@
         .bot .message-content {
             background: var(--ic-white);
             color: var(--ic-ink);
-            border: 1px solid #ffe4e4;
+            border: 1px solid #dcefe4;
             border-bottom-left-radius: 6px;
         }
 
         .chat-input-area {
             padding: 20px;
             background: rgba(255, 255, 255, 0.94);
-            border-top: 1px solid #ffd2d2;
+            border-top: 1px solid #d8eede;
             backdrop-filter: blur(4px);
             position: sticky;
             bottom: 0;
@@ -177,14 +179,14 @@
         }
 
         .search-form input:focus {
-            border-color: var(--ic-red-600);
-            box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.16);
+            border-color: var(--ic-green-700);
+            box-shadow: 0 0 0 4px rgba(31, 122, 85, 0.16);
         }
 
         .search-form button {
             width: 50px;
             height: 50px;
-            background: linear-gradient(135deg, var(--ic-red-700) 0%, var(--ic-red-500) 100%);
+            background: linear-gradient(135deg, var(--ic-green-800) 0%, var(--ic-green-600) 100%);
             color: var(--ic-white);
             border: none;
             border-radius: 50%;
@@ -211,9 +213,9 @@
             border-radius: 12px;
             padding: 16px;
             margin: 10px 0;
-            border: 1px solid #ffd9d9;
-            border-left: 4px solid var(--ic-red-600);
-            box-shadow: 0 8px 20px rgba(220, 38, 38, 0.08);
+            border: 1px solid #dceddf;
+            border-left: 4px solid var(--ic-green-700);
+            box-shadow: 0 8px 20px rgba(17, 89, 64, 0.09);
             overflow: hidden;
         }
 
@@ -268,9 +270,9 @@
         .btn-view {
             flex: 1;
             padding: 8px 12px;
-            background: var(--ic-red-50);
-            color: var(--ic-red-900);
-            border: 1px solid #f4b8b8;
+            background: var(--ic-gold-100);
+            color: var(--ic-green-900);
+            border: 1px solid #efd67e;
             border-radius: 6px;
             cursor: pointer;
             font-size: 14px;
@@ -281,18 +283,18 @@
         }
 
         .btn-view:hover {
-            background: #ffdede;
+            background: #ffe9a6;
             transform: translateY(-1px);
         }
 
         .analysis-preview {
-            background: var(--ic-red-50);
+            background: var(--ic-green-50);
             padding: 12px;
             border-radius: 6px;
             margin-top: 12px;
             font-size: 13px;
             line-height: 1.5;
-            border: 1px solid #ffd6d6;
+            border: 1px solid #d6ebde;
         }
 
         .no-results {
@@ -511,7 +513,7 @@
                 data.results.forEach(student => {
                     const statusColor = student.pending_submissions > 0 ? '🟠' : '🟢';
                     const analysis = student.latest_analysis || {};
-                    const score = analysis.score_percent || '-';
+                    const score = (analysis.score_percent ?? '-');
                     const recommendation = analysis.recommendation || '-';
                     const lastSubmission = student.last_submission ? new Date(student.last_submission).toLocaleDateString() : '-';
 
@@ -599,7 +601,7 @@
                         return;
                     }
                     const analysis = j.analysis || {};
-                    const score = analysis.score_percent || '-';
+                    const score = (analysis.score_percent ?? '-');
                     const recommendation = (analysis.recommendation || '-').toUpperCase();
                     const risk = (analysis.authenticity_risk || '-').toUpperCase();
                     const matchedItems = (analysis.matched_items || analysis.matched_skills || []);
@@ -611,6 +613,7 @@
                     const suspiciousCount = suspiciousSignals.length;
                     const errorTypeCount = errorTypes.length;
                     const summary = analysis.summary || 'Analysis completed with no additional summary from model.';
+                    const feedback = analysis.feedback || 'No additional feedback provided.';
 
                     const missingHtml = mismatchCount > 0
                         ? mismatchItems.slice(0, 5).map(item => `- ${item}`).join('<br>')
@@ -636,7 +639,8 @@
                         `<strong>What is Missing:</strong><br>${missingHtml}<br><br>` +
                         `<strong>Error Types:</strong><br>${errorTypesHtml}<br><br>` +
                         `<strong>Fraud/Suspicious Signals:</strong><br>${suspiciousHtml}<br><br>` +
-                        `<strong>Summary:</strong><br>${summary}` +
+                        `<strong>Summary:</strong><br>${summary}<br><br>` +
+                        `<strong>Feedback:</strong><br>${feedback}` +
                         `</div>`
                     );
                 } catch (err) {

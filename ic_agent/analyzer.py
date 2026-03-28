@@ -48,6 +48,19 @@ def _fallback_weekly_summary(
 	)
 
 
+def _fallback_weekly_feedback(
+	match_percent: int,
+	authenticity_risk: str,
+	mismatch_items: list[str],
+	suspicious_signals: list[str],
+) -> str:
+	if authenticity_risk == "high" or match_percent < 50:
+		return "Report quality is weak. Add concrete evidence, align tasks to OPPM/SRS, and remove unrelated claims."
+	if mismatch_items or suspicious_signals:
+		return "Improve report clarity with specific completed tasks, measurable outcomes, and proof links/screenshots."
+	return "Good progress. Keep reporting specific deliverables and evidence each week."
+
+
 def _derive_error_types(
 	authenticity_risk: str,
 	mismatch_items: list[str],
@@ -82,7 +95,7 @@ def _derive_error_types(
 	return result
 
 
-def _generate_with_ollama(prompt: str) -> str:
+def _generate_with_ollama(prompt: str, expect_json: bool = False) -> str:
 	if not OLLAMA_MODEL:
 		raise ValueError("OLLAMA_MODEL is missing in environment variables")
 
@@ -95,6 +108,8 @@ def _generate_with_ollama(prompt: str) -> str:
 		"messages": [{"role": "user", "content": prompt}],
 		"stream": False,
 	}
+	if expect_json:
+		chat_payload["format"] = "json"
 	chat_body = json.dumps(chat_payload).encode("utf-8")
 	chat_request = urllib.request.Request(
 		chat_endpoint,
@@ -124,6 +139,8 @@ def _generate_with_ollama(prompt: str) -> str:
 		"prompt": prompt,
 		"stream": False,
 	}
+	if expect_json:
+		generate_payload["format"] = "json"
 	generate_body = json.dumps(generate_payload).encode("utf-8")
 	generate_request = urllib.request.Request(
 		generate_endpoint,
@@ -174,12 +191,62 @@ def _extract_json_block(text: str) -> str:
 	raise ValueError("No JSON object found in model response")
 
 
-def _parse_model_json_response(raw_response_text: str, schema_name: str) -> dict[str, Any]:
+def _schema_defaults(schema_name: str) -> dict[str, Any]:
+	if schema_name == "weekly_report_integrity_analysis":
+		return {
+			"match_percent": 0,
+			"authenticity_risk": "high",
+			"matched_items": [],
+			"mismatch_items": ["Report content lacked enough structured evidence for reliable verification"],
+			"suspicious_signals": ["Inconsistent or unclear reporting format in submission"],
+			"error_types": ["suspicious_pattern"],
+			"summary": "Analysis completed with conservative fallback because report details were not reliably structured.",
+			"feedback": "Please resubmit with clear weekly evidence and OPPM/SRS-aligned progress details.",
+			"recommendation": "reject",
+		}
+
+	# student_skill_analysis default
+	return {
+		"matched_skills": [],
+		"missing_skills": ["Insufficient structured evidence extracted for skills matching"],
+		"score_percent": 0,
+		"summary": "Analysis completed with conservative fallback because extracted content was not structured enough.",
+		"feedback": "Please provide clearer evidence for completed skills and deliverables.",
+		"recommendation": "review",
+	}
+
+
+def _parse_json_relaxed(text: str) -> dict[str, Any] | None:
 	try:
-		json_text = _extract_json_block(raw_response_text)
-		return json.loads(json_text)
+		json_text = _extract_json_block(text)
+	except Exception:
+		json_text = text
+
+	try:
+		parsed = json.loads(json_text)
+		if isinstance(parsed, dict):
+			return parsed
 	except Exception:
 		pass
+
+	# Common cleanup: smart quotes and trailing commas.
+	normalized = json_text.replace("\u201c", '"').replace("\u201d", '"').replace("\u2018", "'").replace("\u2019", "'")
+	normalized = re.sub(r",\s*([}\]])", r"\1", normalized)
+
+	try:
+		parsed = json.loads(normalized)
+		if isinstance(parsed, dict):
+			return parsed
+	except Exception:
+		return None
+
+	return None
+
+
+def _parse_model_json_response(raw_response_text: str, schema_name: str) -> dict[str, Any]:
+	first_pass = _parse_json_relaxed(raw_response_text)
+	if first_pass is not None:
+		return first_pass
 
 	# Self-heal: ask model to convert prior response into strict JSON only.
 	repair_prompt = f"""
@@ -198,9 +265,34 @@ Response to convert:
 {raw_response_text}
 """.strip()
 
-	repaired_text = _generate_with_ollama(repair_prompt)
-	json_text = _extract_json_block(repaired_text)
-	return json.loads(json_text)
+	try:
+		repaired_text = _generate_with_ollama(repair_prompt, expect_json=True)
+		repaired_pass = _parse_json_relaxed(repaired_text)
+		if repaired_pass is not None:
+			return repaired_pass
+	except Exception as exc:
+		logger.warning("First JSON repair attempt failed for %s: %s", schema_name, exc)
+
+	# Second repair prompt with stronger constraints.
+	second_repair_prompt = f"""
+Return ONLY one valid minified JSON object for schema: {schema_name}.
+No markdown, no text before/after JSON, no comments, no trailing commas.
+If unsure, use safe defaults and keep required keys present.
+
+Source text:
+{raw_response_text}
+""".strip()
+
+	try:
+		repaired_text_2 = _generate_with_ollama(second_repair_prompt, expect_json=True)
+		repaired_pass_2 = _parse_json_relaxed(repaired_text_2)
+		if repaired_pass_2 is not None:
+			return repaired_pass_2
+	except Exception as exc:
+		logger.warning("Second JSON repair attempt failed for %s: %s", schema_name, exc)
+
+	logger.error("Falling back to schema defaults due to malformed model output for %s", schema_name)
+	return _schema_defaults(schema_name)
 
 
 def analyze_student_work(student_name: str, oppm_content: str, srs_content: str) -> dict[str, Any]:
@@ -218,6 +310,7 @@ Instructions:
   "missing_skills": ["..."],
   "score_percent": 0,
   "summary": "...",
+	"feedback": "...",
   "recommendation": "approve"
 }}
 
@@ -226,6 +319,7 @@ Rules:
 - score_percent must be an integer from 0 to 100
 - matched_skills and missing_skills must be arrays of strings
 - summary should be concise and explain major strengths and gaps
+- feedback should be practical and actionable for student improvement
 
 Student Name: {student_name}
 
@@ -236,7 +330,7 @@ SRS DOCUMENT:
 {srs_content}
 """.strip()
 
-	response_text = _generate_with_ollama(prompt)
+	response_text = _generate_with_ollama(prompt, expect_json=True)
 
 	parsed = _parse_model_json_response(response_text, "student_skill_analysis")
 
@@ -245,6 +339,7 @@ SRS DOCUMENT:
 	missing = parsed.get("missing_skills", [])
 	score = parsed.get("score_percent", 0)
 	summary = str(parsed.get("summary", "")).strip()
+	feedback = str(parsed.get("feedback", "")).strip() or "Provide clearer evidence and align submissions to required skills."
 	recommendation = str(parsed.get("recommendation", "review")).strip().lower()
 	if recommendation not in {"approve", "review", "reject"}:
 		recommendation = "review"
@@ -261,6 +356,7 @@ SRS DOCUMENT:
 		"missing_skills": [str(item) for item in missing],
 		"score_percent": score,
 		"summary": summary,
+		"feedback": feedback,
 		"recommendation": recommendation,
 	}
 
@@ -287,6 +383,7 @@ Return ONLY valid JSON with this exact schema:
   "suspicious_signals": ["..."],
 	"error_types": ["..."] ,
   "summary": "...",
+	"feedback": "...",
   "recommendation": "approve"
 }}
 
@@ -298,6 +395,7 @@ Rules:
 	"possible_fabrication", "oppm_srs_mismatch", "vague_reporting", "missing_evidence", "out_of_scope_claim", "timeline_inconsistency", "suspicious_pattern"
 - if no issue exists, return an empty error_types array
 - Be strict about fake indicators: vague claims, no concrete progress, claims unrelated to OPPM/SRS.
+- feedback should give specific next steps to improve the next weekly report
 - Scoring rubric for match_percent (use this range logic):
 	- 90-100: Strong concrete alignment to OPPM/SRS, specific deliverables, minimal mismatch.
 	- 75-89: Good alignment with clear evidence, minor gaps.
@@ -321,7 +419,7 @@ WEEKLY REPORT (submitted work):
 {report_content}
 """.strip()
 
-	response_text = _generate_with_ollama(prompt)
+	response_text = _generate_with_ollama(prompt, expect_json=True)
 
 	parsed = _parse_model_json_response(response_text, "weekly_report_integrity_analysis")
 
@@ -372,6 +470,15 @@ WEEKLY REPORT (submitted work):
 			suspicious_signals,
 		)
 
+	feedback = str(parsed.get("feedback", "")).strip()
+	if not feedback:
+		feedback = _fallback_weekly_feedback(
+			match_percent,
+			authenticity_risk,
+			mismatch_items,
+			suspicious_signals,
+		)
+
 	return {
 		"match_percent": match_percent,
 		"score_percent": match_percent,
@@ -383,6 +490,7 @@ WEEKLY REPORT (submitted work):
 		"suspicious_signals": suspicious_signals,
 		"error_types": error_types,
 		"summary": summary,
+		"feedback": feedback,
 		"recommendation": recommendation,
 	}
 
