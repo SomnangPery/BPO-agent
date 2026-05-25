@@ -5,3 +5,5 @@ credentials.json
 __pycache__/
 ic_agent.db
 ic_agent.db.backup.*
+chroma_store/
+training_log.txt

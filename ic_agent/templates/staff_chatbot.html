@@ -436,7 +436,7 @@
 <body>
     <div class="container">
         <nav class="navbar">
-            <div class="nav-brand">IC Chat - Student Search</div>
+            <div class="nav-brand">IC Chat - Progress Assistant</div>
             <div class="nav-menu">
                 <span>IC Staff</span>
             </div>
@@ -447,14 +447,14 @@
                 <div class="message bot">
                     <div class="message-content">
                         <strong>Welcome to IC Chat! 👋</strong><br>
-                        Type a student name, then tap search to see their progress, submissions, and analysis scores.
+                        Ask about a student or project progress. Example: "What's the progress of photobooth project?" or "Progress of Sovanara".
                     </div>
                 </div>
             </div>
 
             <div class="chat-input-area">
                 <div class="search-form">
-                    <input type="text" id="searchInput" placeholder="Search student by name..." autocomplete="off">
+                    <input type="text" id="searchInput" placeholder="Ask student/project progress..." autocomplete="off">
                     <button id="searchBtn" aria-label="Search student" title="Search">
                         <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                             <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"></circle>
@@ -470,6 +470,11 @@
         const searchInput = document.getElementById('searchInput');
         const searchBtn = document.getElementById('searchBtn');
         const chatMessages = document.getElementById('chatMessages');
+        const chatContext = {
+            last_type: '',
+            last_project_name: '',
+            last_student_name: ''
+        };
 
         function addMessage(content, isUser = false) {
             const messageEl = document.createElement('div');
@@ -479,85 +484,194 @@
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
-        async function searchStudents(query) {
+        function renderAnalysisCard(analysis, title = 'Analysis Result') {
+            const score = (analysis.score_percent ?? '-');
+            const recommendation = (analysis.recommendation || '-').toUpperCase();
+            const risk = (analysis.authenticity_risk || '-').toUpperCase();
+            const matchedItems = (analysis.matched_items || analysis.matched_skills || []);
+            const mismatchItems = (analysis.mismatch_items || analysis.missing_skills || []);
+            const suspiciousSignals = (analysis.suspicious_signals || []);
+            const errorTypes = (analysis.error_types || []);
+            const matchedCount = matchedItems.length;
+            const mismatchCount = mismatchItems.length;
+            const suspiciousCount = suspiciousSignals.length;
+            const errorTypeCount = errorTypes.length;
+            const summary = analysis.summary || 'Analysis completed with no additional summary from model.';
+            const feedback = analysis.feedback || 'No additional feedback provided.';
+
+            const missingHtml = mismatchCount > 0
+                ? mismatchItems.slice(0, 5).map(item => `- ${item}`).join('<br>')
+                : 'None detected.';
+            const suspiciousHtml = suspiciousCount > 0
+                ? suspiciousSignals.slice(0, 5).map(item => `- ${item}`).join('<br>')
+                : 'None detected.';
+            const errorTypesHtml = errorTypeCount > 0
+                ? errorTypes.map(item => `- ${String(item).replace(/_/g, ' ')}`).join('<br>')
+                : 'None detected.';
+            const fraudBanner = suspiciousCount > 0 || risk === 'HIGH'
+                ? '<br><strong style="color:#b91c1c;">Potential Fraud Alert:</strong> Suspicious indicators found.'
+                : '<br><strong style="color:#15803d;">Fraud Check:</strong> No suspicious indicators detected.';
+
+            return (
+                `<div class="analysis-preview">` +
+                `<strong>${title}</strong><br>` +
+                `Score: ${score}%<br>` +
+                `Recommendation: ${recommendation}<br>` +
+                `Risk: ${risk}<br>` +
+                `Matched: ${matchedCount}, Missing/Mismatch: ${mismatchCount}, Suspicious: ${suspiciousCount}, Error Types: ${errorTypeCount}` +
+                `${fraudBanner}<br><br>` +
+                `<strong>What is Missing:</strong><br>${missingHtml}<br><br>` +
+                `<strong>Error Types:</strong><br>${errorTypesHtml}<br><br>` +
+                `<strong>Fraud/Suspicious Signals:</strong><br>${suspiciousHtml}<br><br>` +
+                `<strong>Summary:</strong><br>${summary}<br><br>` +
+                `<strong>Feedback:</strong><br>${feedback}` +
+                `</div>`
+            );
+        }
+
+        function renderStudentCard(student) {
+            const statusColor = student.pending_submissions > 0 ? '🟠' : '🟢';
+            const analysis = student.latest_analysis || {};
+            const score = (analysis.score_percent ?? '-');
+
+            let content = `
+                <div class="student-card">
+                    <div class="student-header">
+                        <div>
+                            <div class="student-name">${student.name}</div>
+                            <div class="student-id">ID: ${student.student_identifier || '-'}</div>
+                        </div>
+                        <span>${statusColor}</span>
+                    </div>
+                    <div class="student-stats">
+                        <div class="stat">
+                            <div class="stat-label">Total Submissions</div>
+                            <div class="stat-value">${student.total_submissions || 0}</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-label">Pending</div>
+                            <div class="stat-value">${student.pending_submissions || 0}</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-label">Score</div>
+                            <div class="stat-value">${score}${score !== '-' ? '%' : ''}</div>
+                        </div>
+                    </div>
+                `;
+
+            if (analysis.matched_skills && analysis.matched_skills.length > 0) {
+                content += `
+                    <div class="analysis-preview">
+                        <strong>Matched Skills (${analysis.matched_skills.length}):</strong><br>
+                        ${analysis.matched_skills.slice(0, 3).join(', ')}${analysis.matched_skills.length > 3 ? '...' : ''}
+                    </div>
+                `;
+            }
+
+            content += `</div>`;
+            return content;
+        }
+
+        function renderProjectCard(project) {
+            const statusBadge = project.status === 'completed' ? '🟢' : '🟠';
+            return `
+                <div class="student-card">
+                    <div class="student-header">
+                        <div>
+                            <div class="student-name">${project.project_name}</div>
+                            <div class="student-id">Project Progress</div>
+                        </div>
+                        <span>${statusBadge}</span>
+                    </div>
+                    <div class="student-stats">
+                        <div class="stat">
+                            <div class="stat-label">Completion</div>
+                            <div class="stat-value">${project.completion_percent || 0}%</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-label">Total Reports</div>
+                            <div class="stat-value">${project.total_reports || 0}</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-label">Sections</div>
+                            <div class="stat-value">${project.has_oppm ? 'OPPM' : '-'} / ${project.has_srs ? 'SRS' : '-'} / ${project.has_report ? 'Report' : '-'}</div>
+                        </div>
+                    </div>
+                    <div class="analysis-preview">
+                        <strong>Latest Files</strong><br>
+                        OPPM: ${project.latest_oppm_name || '-'}<br>
+                        SRS: ${project.latest_srs_name || '-'}<br>
+                        Report: ${project.latest_report_name || '-'}
+                    </div>
+                </div>
+            `;
+        }
+
+        async function submitQuery(query) {
             if (!query.trim() || query.length < 2) {
                 addMessage("Please enter at least 2 characters to search.");
                 return;
             }
 
-            // Add user message
-            addMessage(`Search: ${query}`, true);
+            addMessage(query, true);
 
-            // Show loading state
             addMessage("🔍 Searching...");
             const loadingMsg = chatMessages.lastChild;
 
             try {
-                const response = await fetch(`/api/search_student?q=${encodeURIComponent(query)}`);
+                const response = await fetch('/api/chat_query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query, context: chatContext })
+                });
                 const data = await response.json();
-
-                // Remove loading message
                 loadingMsg.remove();
 
                 if (!data.success) {
-                    addMessage("❌ Search failed. Please try again.");
+                    addMessage(`❌ ${data.message || 'Search failed. Please try again.'}`);
                     return;
                 }
 
-                if (data.results.length === 0) {
-                    addMessage("No students found. Try a different name.");
-                    return;
+                if (data.assistant_reply) {
+                    addMessage(data.assistant_reply);
                 }
 
-                // Add each student result as a message
-                data.results.forEach(student => {
-                    const statusColor = student.pending_submissions > 0 ? '🟠' : '🟢';
-                    const analysis = student.latest_analysis || {};
-                    const score = (analysis.score_percent ?? '-');
-                    const recommendation = analysis.recommendation || '-';
-                    const lastSubmission = student.last_submission ? new Date(student.last_submission).toLocaleDateString() : '-';
-
-                    let content = `
-                        <div class="student-card">
-                            <div class="student-header">
-                                <div>
-                                    <div class="student-name">${student.name}</div>
-                                    <div class="student-id">ID: ${student.student_identifier || '-'}</div>
-                                </div>
-                                <span>${statusColor}</span>
-                            </div>
-                            <div class="student-stats">
-                                <div class="stat">
-                                    <div class="stat-label">Total Submissions</div>
-                                    <div class="stat-value">${student.total_submissions || 0}</div>
-                                </div>
-                                <div class="stat">
-                                    <div class="stat-label">Pending</div>
-                                    <div class="stat-value">${student.pending_submissions || 0}</div>
-                                </div>
-                                <div class="stat">
-                                    <div class="stat-label">Score</div>
-                                    <div class="stat-value">${score}${score !== '-' ? '%' : ''}</div>
-                                </div>
-                            </div>
-                        <div class="student-actions">
-                            <button class="btn-view analyze-btn" data-id="${student.id}">Analyze</button>
-                        </div>
-                    `;
-
-                    if (analysis.matched_skills && analysis.matched_skills.length > 0) {
-                        content += `
-                            <div class="analysis-preview">
-                                <strong>✅ Matched Skills (${analysis.matched_skills.length}):</strong><br>
-                                ${analysis.matched_skills.slice(0, 3).join(', ')}${analysis.matched_skills.length > 3 ? '...' : ''}
-                            </div>
-                        `;
+                if (data.type === 'project' && data.project) {
+                    chatContext.last_type = 'project';
+                    chatContext.last_project_name = data.project.project_name || '';
+                    chatContext.last_student_name = '';
+                    if (!data.assistant_reply) {
+                        addMessage(renderProjectCard(data.project));
                     }
+                    if (!data.assistant_reply && data.analysis) {
+                        addMessage(renderAnalysisCard(data.analysis, `${data.project.project_name} Progress Report`));
+                    } else if (!data.assistant_reply && data.analysis_error) {
+                        addMessage(`⚠️ Project found, but analysis could not run: ${data.analysis_error}`);
+                    }
+                    return;
+                }
 
-                    content += `</div>`;
+                if (data.type === 'student' && Array.isArray(data.results) && data.results.length > 0) {
+                    chatContext.last_type = 'student';
+                    chatContext.last_project_name = '';
+                    chatContext.last_student_name = data.results.length === 1 ? (data.results[0].name || '') : '';
+                    if (!data.assistant_reply) {
+                        data.results.forEach(student => addMessage(renderStudentCard(student)));
+                    }
+                    if (!data.assistant_reply && data.analysis) {
+                        const title = data.results.length === 1
+                            ? `${data.results[0].name} Progress Report`
+                            : 'Progress Report';
+                        addMessage(renderAnalysisCard(data.analysis, title));
+                    } else if (!data.assistant_reply && data.analysis_error) {
+                        addMessage(`⚠️ Student found, but analysis could not run: ${data.analysis_error}`);
+                    }
+                    return;
+                }
 
-                    addMessage(content, false);
-                });
+                if (!data.assistant_reply) {
+                    addMessage(data.message || "No matching student or project found.");
+                }
 
             } catch (error) {
                 console.error('Search error:', error);
@@ -569,7 +683,7 @@
         searchBtn.addEventListener('click', () => {
             const query = searchInput.value;
             if (query.trim()) {
-                searchStudents(query);
+                submitQuery(query);
                 searchInput.value = '';
             }
         });
@@ -578,74 +692,8 @@
             if (e.key === 'Enter') {
                 const query = searchInput.value;
                 if (query.trim()) {
-                    searchStudents(query);
+                    submitQuery(query);
                     searchInput.value = '';
-                }
-            }
-        });
-
-        // Delegate analyze button clicks
-        document.addEventListener('click', async (e) => {
-            if (e.target && e.target.classList.contains('analyze-btn')) {
-                const studentId = e.target.getAttribute('data-id');
-                addMessage('🔬 Running analysis for student...', true);
-                try {
-                    const resp = await fetch('/api/analyze_student', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ student_id: studentId })
-                    });
-                    const j = await resp.json();
-                    if (!j.success) {
-                        addMessage('❌ Analysis failed: ' + (j.message || 'Unknown'));
-                        return;
-                    }
-                    const analysis = j.analysis || {};
-                    const score = (analysis.score_percent ?? '-');
-                    const recommendation = (analysis.recommendation || '-').toUpperCase();
-                    const risk = (analysis.authenticity_risk || '-').toUpperCase();
-                    const matchedItems = (analysis.matched_items || analysis.matched_skills || []);
-                    const mismatchItems = (analysis.mismatch_items || analysis.missing_skills || []);
-                    const suspiciousSignals = (analysis.suspicious_signals || []);
-                    const errorTypes = (analysis.error_types || []);
-                    const matchedCount = matchedItems.length;
-                    const mismatchCount = mismatchItems.length;
-                    const suspiciousCount = suspiciousSignals.length;
-                    const errorTypeCount = errorTypes.length;
-                    const summary = analysis.summary || 'Analysis completed with no additional summary from model.';
-                    const feedback = analysis.feedback || 'No additional feedback provided.';
-
-                    const missingHtml = mismatchCount > 0
-                        ? mismatchItems.slice(0, 5).map(item => `- ${item}`).join('<br>')
-                        : 'None detected.';
-                    const suspiciousHtml = suspiciousCount > 0
-                        ? suspiciousSignals.slice(0, 5).map(item => `- ${item}`).join('<br>')
-                        : 'None detected.';
-                    const errorTypesHtml = errorTypeCount > 0
-                        ? errorTypes.map(item => `- ${String(item).replace(/_/g, ' ')}`).join('<br>')
-                        : 'None detected.';
-                    const fraudBanner = suspiciousCount > 0 || risk === 'HIGH'
-                        ? '<br><strong style="color:#b91c1c;">Potential Fraud Alert:</strong> Suspicious indicators found.'
-                        : '<br><strong style="color:#15803d;">Fraud Check:</strong> No suspicious indicators detected.';
-
-                    addMessage(
-                        `<div class="analysis-preview">` +
-                        `<strong>Analysis Result</strong><br>` +
-                        `Score: ${score}%<br>` +
-                        `Recommendation: ${recommendation}<br>` +
-                        `Risk: ${risk}<br>` +
-                        `Matched: ${matchedCount}, Missing/Mismatch: ${mismatchCount}, Suspicious: ${suspiciousCount}, Error Types: ${errorTypeCount}` +
-                        `${fraudBanner}<br><br>` +
-                        `<strong>What is Missing:</strong><br>${missingHtml}<br><br>` +
-                        `<strong>Error Types:</strong><br>${errorTypesHtml}<br><br>` +
-                        `<strong>Fraud/Suspicious Signals:</strong><br>${suspiciousHtml}<br><br>` +
-                        `<strong>Summary:</strong><br>${summary}<br><br>` +
-                        `<strong>Feedback:</strong><br>${feedback}` +
-                        `</div>`
-                    );
-                } catch (err) {
-                    console.error(err);
-                    addMessage('❌ Analysis request failed.');
                 }
             }
         });

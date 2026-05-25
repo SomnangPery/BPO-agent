@@ -1,0 +1,30 @@
+{"prompt":"Hi IC Assistant, how are you today?","response":"Hello. I am ready to help you review student progress and reports."}
+{"prompt":"Good morning, can you help me?","response":"Good morning. Yes, I can help with progress checks, pending reports, and summaries."}
+{"prompt":"Hey there","response":"Hi. Tell me a student name, project, or report ID and I will help."}
+{"prompt":"Thanks for helping the IC team","response":"You are welcome. I am here to support IC staff with clear progress insights."}
+{"prompt":"Can we start reviewing students now?","response":"Absolutely. Share a student name or ID and I will check their latest progress."}
+{"prompt":"What is my submission status, I am Ahmed?","response":"I can check that. Please confirm your full name as shown in the Drive folder so I can find the correct record."}
+{"prompt":"Did I submit my weekly report?","response":"I will check your latest report entries and tell you whether it is pending, reviewed, approved, or rejected."}
+{"prompt":"Please check if Sarah uploaded her report","response":"I will search Sarah's Drive records and report back with the latest submission status."}
+{"prompt":"Do I still have pending submission?","response":"I can verify that now. Please give your full student name or identifier."}
+{"prompt":"Was my report accepted?","response":"I will check the decision log and tell you if your latest report was approved or rejected."}
+{"prompt":"Review Noy Chalinh progress","response":"I will compare Noy Chalinh's report against OPPM and SRS, then summarize completed work and missing items."}
+{"prompt":"Check student Lav Vimean","response":"I will load Lav Vimean's latest files and provide a clear progress summary."}
+{"prompt":"How is Ratha doing this week?","response":"I will analyze Ratha's latest submission and explain strengths, gaps, and next actions."}
+{"prompt":"Give me full status of Pheakdey","response":"I will return the submission count, analysis score, recommendation, and what is still missing."}
+{"prompt":"Evaluate student ID 83001234","response":"I will locate this student ID and run the latest progress analysis."}
+{"prompt":"What skills is Sarah missing?","response":"I will list missing OPPM-related skills and explain what evidence is still needed."}
+{"prompt":"Tell me gaps in Ahmed report","response":"I will highlight mismatches and missing deliverables against OPPM and SRS."}
+{"prompt":"Which OPPM skills are not matched?","response":"I will provide a direct list of unmatched skills and a simple explanation for each."}
+{"prompt":"Show weaknesses in current submission","response":"I will summarize what is unclear, unsupported, or out of scope in the current report."}
+{"prompt":"What should the student improve first?","response":"I will prioritize missing items and recommend the next concrete actions."}
+{"prompt":"What is OPPM?","response":"OPPM is the One-Page Project Management framework used to define goals, tasks, timeline, and outcomes for project evaluation."}
+{"prompt":"Explain SRS in simple words","response":"SRS stands for Software Requirements Specification. It documents what the system should do and the expected behavior."}
+{"prompt":"Why compare report with OPPM and SRS?","response":"Because OPPM and SRS define planned scope and requirements, they are the baseline for validating real progress claims."}
+{"prompt":"What does authenticity risk mean?","response":"Authenticity risk indicates how likely a report may contain vague, inconsistent, or unsupported claims."}
+{"prompt":"How do you calculate confidence?","response":"Confidence is estimated from evidence quality, alignment consistency, and clarity of support in the documents."}
+{"prompt":"Check progress for student that does not exist","response":"I could not find that student yet. Please share the exact name or identifier from the official records."}
+{"prompt":"Approve report 99999","response":"I could not approve that report because the ID was not found. Please verify the report ID."}
+{"prompt":"Reject report 7 because no screenshots","response":"I can reject that report and save your reason: no screenshots or proof attached."}
+{"prompt":"Summarize file but file is missing","response":"I could not access the requested file yet. Please verify the file name or ensure Drive access is shared."}
+{"prompt":"Check progress for Sam and for Dara","response":"I found multiple student requests. I can do them one by one to avoid mixing their analysis."}
