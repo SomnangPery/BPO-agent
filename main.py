@@ -1,6 +1,6 @@
 import logging
 from ic_agent.database import init_db
-from ic_agent.web import create_app
+from ic_agent.server import create_app
 
 logging.basicConfig(
     level=logging.INFO,
