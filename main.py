@@ -15,7 +15,7 @@ def main() -> None:
     
     # Configuration from environment variables
     port = int(os.getenv("PORT", "5000"))
-    debug = os.getenv("FLASK_ENV", "production").lower() != "production"
+    debug = os.getenv("FLASK_ENV", "development").lower() != "production"
     host = os.getenv("FLASK_HOST", "0.0.0.0")
     
     print(f"Starting IC Agent web server at http://{host}:{port}")

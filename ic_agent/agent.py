@@ -5,6 +5,8 @@ from ic_agent.config import AGENT_MODEL, ANTHROPIC_API_KEY
 from ic_agent.tools import build_tools
 
 def create_ic_agent():
+    if not ANTHROPIC_API_KEY:
+        raise ValueError("ANTHROPIC_API_KEY is not set. Please provide it in your .env file or environment variables.")
     llm = ChatAnthropic(model=AGENT_MODEL, anthropic_api_key=ANTHROPIC_API_KEY, temperature=0)
     tools = build_tools()
     

@@ -8,12 +8,16 @@ from dotenv import load_dotenv
 # Prefer values from this project's .env over inherited shell/user env vars.
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 _DOTENV_PATH = _PROJECT_ROOT / ".env"
-load_dotenv(dotenv_path=_DOTENV_PATH, override=True)
+if _DOTENV_PATH.exists():
+    print(f"Loading environment from {_DOTENV_PATH}")
+    load_dotenv(dotenv_path=_DOTENV_PATH, override=True)
+else:
+    print(f"No .env file found at {_DOTENV_PATH}")
 
 logger = logging.getLogger(__name__)
 
 # Check deployment environment
-FLASK_ENV = os.getenv("FLASK_ENV", "production")
+FLASK_ENV = os.getenv("FLASK_ENV", "development")
 IS_PRODUCTION = FLASK_ENV.lower() == "production"
 
 def _csv_env_list(name: str) -> list[str]:
