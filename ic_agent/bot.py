@@ -15,6 +15,7 @@ from ic_agent.database import (
 )
 from ic_agent.drive import get_all_projects as drive_get_all_projects, classify_project_files
 from ic_agent.reports import format_report_message
+from ic_agent.fuzzy import find_best_project_match
 
 logger = logging.getLogger(__name__)
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -30,20 +31,20 @@ def handle_query(update: Update, context: CallbackContext):
         update.message.reply_text("Please provide a query.")
         return
 
-    name_to_find = query.replace("analyze ", "").strip().lower()
+    name_to_find = query.replace("analyze ", "").strip()
     drive_projects = drive_get_all_projects(GOOGLE_DRIVE_FOLDER_ID)
-    matches = [p for p in drive_projects if name_to_find in p["project_name"].lower()]
+    
+    # Use fuzzy matching to find the best project
+    target, confidence = find_best_project_match(name_to_find, drive_projects, threshold=70)
 
-    if not matches:
-        update.message.reply_text(f"No project folder found matching '{query}'.")
+    if not target:
+        available = ", ".join([p["project_name"] for p in drive_projects[:10]])
+        update.message.reply_text(f"No project folder found matching '{query}'.\n\nAvailable projects:\n{available}")
         return
 
-    if len(matches) > 1:
-        names = ", ".join([p["project_name"] for p in matches[:5]])
-        update.message.reply_text(f"Multiple projects matched: {names}. Please be more specific.")
-        return
+    if confidence < 75:
+        logger.warning(f"Low confidence match for '{name_to_find}': {target['project_name']} ({confidence}%)")
 
-    target = matches[0]
     project_name = target["project_name"]
     folder_id = target["folder_id"]
 

@@ -12,6 +12,7 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 
 from ic_agent.config import GOOGLE_CREDENTIALS_PATH
+from ic_agent.fuzzy import classify_file_by_name
 
 
 logger = logging.getLogger(__name__)
@@ -117,7 +118,6 @@ def classify_project_files(folder_id: str) -> dict[str, Any]:
 	classified = {"oppm": None, "srs": None, "reports": []}
 
 	for f in results.get("files", []):
-		name_lower = f["name"].lower()
 		content = read_file_content(f["id"], f["mimeType"])
 		
 		info = {
@@ -128,12 +128,26 @@ def classify_project_files(folder_id: str) -> dict[str, Any]:
 			"readable": bool(content.strip())
 		}
 
-		if "oppm" in name_lower:
-			classified["oppm"] = info
-		elif "srs" in name_lower:
-			classified["srs"] = info
+		# Use fuzzy matching to classify file
+		category, confidence = classify_file_by_name(f["name"])
+		
+		if category == "oppm" and confidence >= 75:
+			if classified["oppm"] is None:
+				classified["oppm"] = info
+				logger.info(f"Classified '{f['name']}' as OPPM (confidence: {confidence}%)")
+			elif confidence > 90:  # Replace if higher confidence
+				classified["oppm"] = info
+		elif category == "srs" and confidence >= 75:
+			if classified["srs"] is None:
+				classified["srs"] = info
+				logger.info(f"Classified '{f['name']}' as SRS (confidence: {confidence}%)")
+			elif confidence > 90:  # Replace if higher confidence
+				classified["srs"] = info
 		else:
+			# Default to reports if category is "report" or no confident match
 			classified["reports"].append(info)
+			if category != "report":
+				logger.debug(f"File '{f['name']}' classified as report (category: {category}, confidence: {confidence}%)")
 
 	return classified
 

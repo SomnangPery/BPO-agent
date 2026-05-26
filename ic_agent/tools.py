@@ -16,6 +16,7 @@ from ic_agent.database import (
 from ic_agent.drive import get_all_projects, classify_project_files
 from ic_agent.analyzer import analyze_project
 from ic_agent.reports import format_report_message
+from ic_agent.fuzzy import find_best_project_match
 
 logger = logging.getLogger(__name__)
 
@@ -28,17 +29,17 @@ class DecisionInput(BaseModel):
 
 def analyze_project_tool(project_query: str) -> str:
     """Find a project folder, classify files, run analysis, and return report."""
-    # 1. Find folder
+    # 1. Find folder using fuzzy matching
     drive_projects = get_all_projects(GOOGLE_DRIVE_FOLDER_ID)
-    matches = [p for p in drive_projects if project_query.lower() in p["project_name"].lower()]
+    target, confidence = find_best_project_match(project_query, drive_projects, threshold=70)
     
-    if not matches:
-        return f"No project folder found matching '{project_query}'."
-    if len(matches) > 1:
-        names = ", ".join([p["project_name"] for p in matches[:5]])
-        return f"Multiple projects matched: {names}. Please be more specific."
-
-    target = matches[0]
+    if not target:
+        available = ", ".join([p["project_name"] for p in drive_projects[:10]])
+        return f"No project folder found matching '{project_query}'.\n\nAvailable projects:\n{available}"
+    
+    if confidence < 75:
+        logger.warning(f"Low confidence match for '{project_query}': {target['project_name']} ({confidence}%)")
+    
     project_name = target["project_name"]
     folder_id = target["folder_id"]
 
