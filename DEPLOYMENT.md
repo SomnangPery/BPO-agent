@@ -31,13 +31,25 @@ FLASK_HOST=0.0.0.0
 ANTHROPIC_API_KEY=your-api-key
 WEB_SECRET_KEY=generate-with-: python -c "import secrets; print(secrets.token_hex(32))"
 IC_STAFF_PASSWORD=your-secure-password
+TELEGRAM_BOT_TOKEN=your-bot-token
 
-# Google Drive integration (required if using drive features)
+# Google Drive integration
 GOOGLE_DRIVE_FOLDER_ID=your-folder-id
+# Option A: Path to file (not recommended for cloud)
 GOOGLE_CREDENTIALS_PATH=credentials.json
+# Option B: JSON string (recommended for Railway/Heroku)
+GOOGLE_CREDENTIALS_JSON='{"type": "service_account", ...}'
 ```
 
-### 3. Generate a secure `WEB_SECRET_KEY`
+### 3. Railway Deployment
+
+This project includes a `Procfile` for Railway. It will automatically start two processes:
+1. `web`: The Flask web interface.
+2. `bot`: The Telegram bot (Long Polling).
+
+Ensure you have set `TELEGRAM_BOT_TOKEN` in your Railway variables for the bot to work.
+
+### 4. Generate a secure `WEB_SECRET_KEY`
 
 ```bash
 python -c "import secrets; print(secrets.token_hex(32))"

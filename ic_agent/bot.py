@@ -114,3 +114,13 @@ def run_telegram_bot() -> None:
             updater.stop()
         except Exception:
             pass
+
+
+if __name__ == "__main__":
+    from ic_agent.database import init_db
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
+    )
+    init_db()
+    run_telegram_bot()

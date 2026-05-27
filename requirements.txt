@@ -13,4 +13,4 @@ sentence-transformers>=2.7.0
 anthropic>=0.37.1
 fuzzywuzzy>=0.18.0
 python-Levenshtein>=0.12.0
-python-telegram-bot>=20.0
+python-telegram-bot==13.15

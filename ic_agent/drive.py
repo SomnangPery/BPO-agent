@@ -1,4 +1,5 @@
 import io
+import json
 import logging
 import os
 import re
@@ -11,7 +12,7 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 
-from ic_agent.config import GOOGLE_CREDENTIALS_PATH
+from ic_agent.config import GOOGLE_CREDENTIALS_PATH, GOOGLE_CREDENTIALS_JSON
 from ic_agent.fuzzy import classify_file_by_name
 
 
@@ -24,12 +25,22 @@ _drive_service = None
 def _get_drive_service():
 	global _drive_service
 	if _drive_service is None:
-		if not os.path.exists(GOOGLE_CREDENTIALS_PATH):
-			raise FileNotFoundError(f"Credentials file not found: {GOOGLE_CREDENTIALS_PATH}")
-		credentials = service_account.Credentials.from_service_account_file(
-			GOOGLE_CREDENTIALS_PATH,
-			scopes=SCOPES,
-		)
+		if GOOGLE_CREDENTIALS_JSON:
+			logger.info("Using Google credentials from environment variable.")
+			info = json.loads(GOOGLE_CREDENTIALS_JSON)
+			credentials = service_account.Credentials.from_service_account_info(
+				info,
+				scopes=SCOPES,
+			)
+		elif os.path.exists(GOOGLE_CREDENTIALS_PATH):
+			logger.info(f"Using Google credentials from file: {GOOGLE_CREDENTIALS_PATH}")
+			credentials = service_account.Credentials.from_service_account_file(
+				GOOGLE_CREDENTIALS_PATH,
+				scopes=SCOPES,
+			)
+		else:
+			raise FileNotFoundError(f"Credentials not found in GOOGLE_CREDENTIALS_JSON or at {GOOGLE_CREDENTIALS_PATH}")
+		
 		_drive_service = build("drive", "v3", credentials=credentials, cache_discovery=False)
 	return _drive_service
 
