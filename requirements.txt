@@ -2,7 +2,7 @@ flask==3.0.0
 google-api-python-client==2.134.0
 google-auth==2.29.0
 python-dotenv==1.0.1
-APScheduler==3.10.4
+APScheduler==3.6.3
 pypdf==6.9.2
 langchain>=0.2.0,<0.3.0
 langchain-community>=0.2.0,<0.3.0
