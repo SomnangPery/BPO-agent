@@ -31,7 +31,7 @@ try:
     
     # Telegram is optional - try to load it
     try:
-        from ic_agent.bot import TelegramBot
+        from ic_agent.bot import run_telegram_bot
         print("  ✅ Telegram bot module")
     except ImportError as e:
         if "telegram" in str(e):

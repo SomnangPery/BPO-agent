@@ -1,3 +1,12 @@
+import sys
+from types import ModuleType
+
+# Monkey patch for 'imghdr' which was removed in Python 3.13
+if sys.version_info >= (3, 13) and "imghdr" not in sys.modules:
+    imghdr = ModuleType("imghdr")
+    imghdr.what = lambda file, h=None: None
+    sys.modules["imghdr"] = imghdr
+
 import logging
 import os
 import threading
