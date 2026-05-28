@@ -2,34 +2,112 @@ import datetime
 import json
 import logging
 import re
+import requests
 from typing import Any
-from anthropic import Anthropic
-from ic_agent.config import AGENT_MODEL, ANTHROPIC_API_KEY, LLM_TIMEOUT_SECONDS
+from anthropic import Anthropic, APIStatusError, APITimeoutError, APIConnectionError
+from ic_agent.config import (
+    AGENT_MODEL,
+    ANTHROPIC_API_KEY,
+    LLM_TIMEOUT_SECONDS,
+    OLLAMA_BASE_URL,
+    OLLAMA_MODEL,
+)
 
 logger = logging.getLogger(__name__)
 
-def _call_llm(prompt: str) -> dict[str, Any]:
+
+# ── LLM caller with Ollama fallback ─────────────────────────────────────────
+
+def _call_claude(prompt: str) -> str:
+    """Call Anthropic Claude. Raises on rate limit / timeout / connection error."""
     client = Anthropic(api_key=ANTHROPIC_API_KEY)
     response = client.messages.create(
         model=AGENT_MODEL,
         max_tokens=4000,
         temperature=0,
-        messages=[{"role": "user", "content": prompt}]
+        timeout=LLM_TIMEOUT_SECONDS,
+        messages=[{"role": "user", "content": prompt}],
     )
-    text = response.content[0].text
-    # Clean possible markdown
+    return response.content[0].text
+
+
+def _call_ollama(prompt: str) -> str:
+    """Call Ollama — local or cloud (set OLLAMA_API_KEY for Ollama Cloud)."""
+    if not OLLAMA_BASE_URL or not OLLAMA_MODEL:
+        raise RuntimeError("Ollama not configured (OLLAMA_BASE_URL / OLLAMA_MODEL not set)")
+
+    url = f"{OLLAMA_BASE_URL.rstrip('/')}/api/generate"
+    headers = {"Content-Type": "application/json"}
+
+    # Add auth header if API key is set (required for Ollama Cloud)
+    import os as _os
+    ollama_api_key = _os.environ.get("OLLAMA_API_KEY", "")
+    if ollama_api_key:
+        headers["Authorization"] = f"Bearer {ollama_api_key}"
+
+    payload = {
+        "model": OLLAMA_MODEL,
+        "prompt": prompt,
+        "stream": False,
+        "options": {"temperature": 0},
+    }
+    resp = requests.post(url, json=payload, headers=headers, timeout=LLM_TIMEOUT_SECONDS)
+    resp.raise_for_status()
+    return resp.json().get("response", "")
+
+
+def _clean_json(text: str) -> dict[str, Any]:
+    """Strip markdown fences and parse JSON."""
     text = re.sub(r"```json\s*", "", text)
     text = re.sub(r"```\s*", "", text)
     try:
         return json.loads(text.strip())
     except Exception:
-        logger.error("Failed to parse LLM JSON: %s", text)
+        logger.error("Failed to parse LLM JSON: %s", text[:500])
         return {"error": "Invalid JSON from LLM"}
+
+
+def _call_llm(prompt: str) -> dict[str, Any]:
+    """
+    Call Claude first. On rate-limit / timeout / connection error,
+    transparently fall back to local Ollama — zero disruption to the user.
+    """
+    # ── Primary: Claude ──────────────────────────────────────────────────────
+    if ANTHROPIC_API_KEY:
+        try:
+            text = _call_claude(prompt)
+            return _clean_json(text)
+        except APIStatusError as e:
+            if e.status_code == 429:
+                logger.warning("Claude rate-limited (429) — switching to Ollama fallback")
+            else:
+                logger.warning("Claude API error %d — switching to Ollama fallback: %s", e.status_code, e)
+        except APITimeoutError:
+            logger.warning("Claude timed out after %ds — switching to Ollama fallback", LLM_TIMEOUT_SECONDS)
+        except APIConnectionError as e:
+            logger.warning("Claude connection failed — switching to Ollama fallback: %s", e)
+        except Exception as e:
+            logger.warning("Claude unexpected error — switching to Ollama fallback: %s", e)
+
+    # ── Fallback: Ollama ─────────────────────────────────────────────────────
+    if OLLAMA_BASE_URL and OLLAMA_MODEL:
+        try:
+            logger.info("Using Ollama fallback: %s @ %s", OLLAMA_MODEL, OLLAMA_BASE_URL)
+            text = _call_ollama(prompt)
+            return _clean_json(text)
+        except Exception as e:
+            logger.error("Ollama fallback also failed: %s", e)
+            return {"error": f"Both Claude and Ollama failed: {e}"}
+
+    return {"error": "No LLM available — set ANTHROPIC_API_KEY or OLLAMA_BASE_URL + OLLAMA_MODEL"}
+
+
+# ── Analysis pipeline (unchanged logic) ─────────────────────────────────────
 
 def analyze_project(project_name: str, classified_files: dict[str, Any]) -> dict[str, Any]:
     timestamp = datetime.datetime.now().isoformat()
-    oppm = classified_files.get("oppm") or {}
-    srs = classified_files.get("srs") or {}
+    oppm    = classified_files.get("oppm") or {}
+    srs     = classified_files.get("srs") or {}
     reports = classified_files.get("reports") or []
 
     # STEP 1 - OPPM Extraction
@@ -63,16 +141,15 @@ SRS: {srs.get("content", "No SRS file found")}
 """
     srs_summary = _call_llm(step2_prompt)
 
-    # STEP 3 - Validate report files
+    # STEP 3 - Validate each report file
     validated_reports = []
-    oppm_reqs = oppm_summary.get("deliverables", []) + oppm_summary.get("skills", [])
+    oppm_reqs    = oppm_summary.get("deliverables", []) + oppm_summary.get("skills", [])
     srs_features = srs_summary.get("features", []) + srs_summary.get("requirements", [])
-    
+
     for r in reports:
         step3_prompt = f"""
 Return ONLY raw JSON. No markdown, no backticks, no explanation.
-You are checking if this submitted file provides evidence of work toward any project requirement. 
-You are NOT checking who submitted it.
+Check if this file provides evidence of work toward any project requirement.
 
 OPPM requirements: {json.dumps(oppm_reqs)}
 SRS features: {json.dumps(srs_features)}
@@ -82,8 +159,8 @@ FILE:
   Type: {r["mime_type"]}
   Content: {r["content"][:5000]}
 
-A file is VALID if its content or name connects to ANY requirement. 
-Early-stage work counts as valid. FAKE only if empty or unrelated.
+A file is VALID if its content or name connects to ANY requirement.
+Early-stage work counts as valid. FAKE only if empty or completely unrelated.
 
 {{
   "file_name": "{r["file_name"]}",
@@ -99,17 +176,16 @@ Early-stage work counts as valid. FAKE only if empty or unrelated.
   "quality_note": "..."
 }}
 """
-        val = _call_llm(step3_prompt)
-        validated_reports.append(val)
+        validated_reports.append(_call_llm(step3_prompt))
 
     # STEP 4 - Progress Calculation
     step4_prompt = f"""
 Return ONLY raw JSON. No markdown, no backticks, no explanation.
 Calculate project completion using tiered coverage:
-  completed    = file IS final deliverable → 100% credit
-  in_progress  = active work → 50% credit
-  planned      = discussed → 20% credit
-  not_started  = no file → 0% credit
+  completed   = final deliverable → 100% credit
+  in_progress = active work       → 50%  credit
+  planned     = discussed only    → 20%  credit
+  not_started = no file           → 0%   credit
 
 Project stage:
   0-15%   = Planning & Documentation Stage
@@ -135,7 +211,7 @@ Validated files: {json.dumps(validated_reports)}
       "evidence": "..."
     }}
   ],
-  "missing_items": [{{ "requirement": "...", "priority": "high|medium|low" }}],
+  "missing_items": [{{"requirement": "...", "priority": "high|medium|low"}}],
   "valid_files": int,
   "fake_files": int,
   "fake_file_names": [...]
@@ -175,18 +251,14 @@ Fake: {json.dumps(progress.get("fake_file_names", []))}
         "srs_summary": srs_summary,
         "file_validations": validated_reports,
         "progress": progress,
-        "verdict": verdict
+        "verdict": verdict,
     }
 
 
-# ============================================================================
-# Compatibility wrappers for web.py
-# ============================================================================
+# ── Compatibility wrappers ───────────────────────────────────────────────────
 
 def analyze_student_work(student_id: int, classified_files: dict[str, Any], student_name: str = "") -> dict[str, Any]:
-    """Compatibility wrapper: analyze student work (maps to analyze_project)."""
     return analyze_project(student_name or f"Student_{student_id}", classified_files)
 
 def analyze_submission_report(classified_files: dict[str, Any], project_name: str = "") -> dict[str, Any]:
-    """Compatibility wrapper: analyze submission report (maps to analyze_project)."""
     return analyze_project(project_name or "Submission", classified_files)
